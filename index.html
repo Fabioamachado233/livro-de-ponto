@@ -190,29 +190,17 @@
 
   <div class="save-status" id="saveStatus"></div>
 
+  <div style="margin-bottom:20px;">
+    <button class="primary" id="guardarTudoBtn">Guardar</button>
+  </div>
+
   <div class="card" id="syncCard" style="display:none;">
-    <h2>Sincronização entre dispositivos</h2>
-    <div id="syncSemCodigo">
-      <div class="preview" style="margin-top:0;">Este telemóvel ou computador ainda não está ligado a nenhum código de sincronização. Cria um código novo aqui e depois cola esse mesmo código no outro dispositivo, para os dois partilharem os mesmos turnos.</div>
-      <div style="margin-top:12px;">
-        <button class="primary" id="criarCodigoBtn">Criar código de sincronização</button>
-      </div>
-      <div class="row" style="margin-top:14px;">
-        <div class="field">
-          <label>Já tenho um código de outro dispositivo</label>
-          <input type="text" id="codigoInput" placeholder="cola aqui o código">
-        </div>
-      </div>
-      <button class="primary" id="ligarCodigoBtn">Ligar a este código</button>
-    </div>
-    <div id="syncComCodigo" style="display:none;">
-      <div class="preview" style="margin-top:0;">Este dispositivo está ligado ao código:</div>
-      <div class="row" style="margin-top:8px;">
-        <div class="field">
-          <input type="text" id="codigoAtual" readonly>
-        </div>
-      </div>
-      <div class="preview">Cola este mesmo código no outro dispositivo, no campo "Já tenho um código de outro dispositivo", para os dois ficarem sincronizados.</div>
+    <h2>Passar dados entre computador e telemóvel</h2>
+    <div class="preview" style="margin-top:0;">O código automático de sincronização não está a funcionar de forma fiável neste momento. Usa em alternativa exportar e importar, é manual mas garantido: exporta aqui, envia o ficheiro para o outro dispositivo, por exemplo por email ou WhatsApp para ti próprio, e importa-o lá.</div>
+    <div class="row" style="margin-top:14px;">
+      <button class="primary" id="exportarBtn">Exportar dados</button>
+      <button class="primary" id="importarBtn">Importar dados</button>
+      <input type="file" id="importarInput" accept="application/json" style="display:none;">
     </div>
   </div>
 
@@ -760,53 +748,69 @@ document.getElementById('metaInput').addEventListener('input', async () => {
 
 function atualizarCartaoSync(){
   const card = document.getElementById('syncCard');
-  if(TEM_STORAGE_NATIVO){
-    card.style.display = 'none';
-    return;
-  }
-  card.style.display = 'block';
-  const bucket = getSyncBucket();
-  const semCodigo = document.getElementById('syncSemCodigo');
-  const comCodigo = document.getElementById('syncComCodigo');
-  if(bucket){
-    semCodigo.style.display = 'none';
-    comCodigo.style.display = 'block';
-    document.getElementById('codigoAtual').value = bucket;
-  } else {
-    semCodigo.style.display = 'block';
-    comCodigo.style.display = 'none';
-  }
+  card.style.display = TEM_STORAGE_NATIVO ? 'none' : 'block';
 }
 
-document.getElementById('criarCodigoBtn').addEventListener('click', async () => {
-  const btn = document.getElementById('criarCodigoBtn');
-  btn.disabled = true;
-  btn.textContent = 'A criar...';
+document.getElementById('exportarBtn').addEventListener('click', () => {
+  const dados = { shifts, rate, goals, exportadoEm: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(dados, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'livro-de-ponto-dados.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  mostrarEstado('Ficheiro exportado', 'ok');
+});
+
+document.getElementById('importarBtn').addEventListener('click', () => {
+  document.getElementById('importarInput').click();
+});
+
+document.getElementById('importarInput').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if(!file) return;
   try{
-    const bucket = await kvdbCriarBalde();
-    setSyncBucket(bucket);
+    const texto = await file.text();
+    const dados = JSON.parse(texto);
+    const confirmar = confirm('Isto substitui os dados atuais deste dispositivo pelos dados do ficheiro importado. Continuar?');
+    if(!confirmar) return;
+    shifts = Array.isArray(dados.shifts) ? dados.shifts : [];
+    rate = typeof dados.rate === 'number' ? dados.rate : parseFloat(dados.rate) || 6;
+    goals = (dados.goals && typeof dados.goals === 'object') ? dados.goals : {};
     await storageSet(STORAGE_KEY, JSON.stringify(shifts));
     await storageSet(RATE_KEY, String(rate));
     await storageSet(GOALS_KEY, JSON.stringify(goals));
-    atualizarCartaoSync();
-    mostrarEstado('Código de sincronização criado', 'ok');
-  }catch(e){
-    console.error(e);
-    mostrarEstado('Não foi possível criar o código agora. Tenta novamente dentro de momentos.', 'erro');
+    document.getElementById('rateInput').value = rate;
+    mesAtualExibido = null;
+    render();
+    mostrarEstado('Dados importados', 'ok');
+  }catch(err){
+    console.error(err);
+    alert('Não foi possível ler este ficheiro. Confirma que é o ficheiro exportado pela própria aplicação.');
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Criar código de sincronização';
+    e.target.value = '';
   }
 });
 
-document.getElementById('ligarCodigoBtn').addEventListener('click', async () => {
-  const codigo = document.getElementById('codigoInput').value.trim();
-  if(!codigo){ alert('Cola o código que aparece no outro dispositivo.'); return; }
-  setSyncBucket(codigo);
-  await loadData();
-  atualizarCartaoSync();
-  render();
-  mostrarEstado('Ligado ao código de sincronização', 'ok');
+document.getElementById('guardarTudoBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('guardarTudoBtn');
+  btn.disabled = true;
+  btn.textContent = 'A guardar...';
+  try{
+    await storageSet(STORAGE_KEY, JSON.stringify(shifts));
+    await storageSet(RATE_KEY, String(rate));
+    await storageSet(GOALS_KEY, JSON.stringify(goals));
+    mostrarEstado('Guardado', 'ok');
+  }catch(e){
+    console.error(e);
+    mostrarEstado('Não foi possível guardar agora. Tenta novamente dentro de momentos.', 'erro');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar';
+  }
 });
 
 (async function init(){
