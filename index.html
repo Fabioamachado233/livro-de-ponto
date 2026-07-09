@@ -334,11 +334,14 @@
 <script>
 let shifts = [];
 let rate = 6;
+let goals = {};
+let mesAtualExibido = null;
 let tipoSelecionado = null;
 let horasSelecionadas = null;
 
 const STORAGE_KEY = 'shifts-v2';
 const RATE_KEY = 'rate-v1';
+const GOALS_KEY = 'goals-v1';
 
 const INICIO = { manha: '08:30', tarde: '14:30', duplo: '08:30' };
 const DURACOES = { manha: [6, 6.5, 7], tarde: [6, 6.5, 7], duplo: [12, 12.5] };
@@ -454,6 +457,10 @@ async function loadData(){
     const v2 = await storageGet(RATE_KEY);
     rate = v2 ? parseFloat(v2) : 6;
   }catch(e){ rate = 6; }
+  try{
+    const v3 = await storageGet(GOALS_KEY);
+    goals = v3 ? JSON.parse(v3) : {};
+  }catch(e){ goals = {}; }
   document.getElementById('rateInput').value = rate;
 }
 
@@ -667,6 +674,12 @@ function renderChart(selectedMonth, filtered){
 function render(){
   populateMonthFilter();
   const selectedMonth = document.getElementById('monthFilter').value;
+
+  if(selectedMonth !== mesAtualExibido){
+    mesAtualExibido = selectedMonth;
+    document.getElementById('metaInput').value = (goals[selectedMonth] !== undefined && goals[selectedMonth] !== null) ? goals[selectedMonth] : '';
+  }
+
   const filtered = shifts.filter(s => monthKey(s.data) === selectedMonth).sort((a,b) => a.data.localeCompare(b.data));
 
   const tbody = document.getElementById('turnosBody');
@@ -733,7 +746,17 @@ document.getElementById('rateInput').addEventListener('change', async (e) => {
   render();
 });
 
-document.getElementById('metaInput').addEventListener('input', render);
+document.getElementById('metaInput').addEventListener('input', async () => {
+  const selectedMonth = document.getElementById('monthFilter').value;
+  const valor = document.getElementById('metaInput').value;
+  if(valor === ''){
+    delete goals[selectedMonth];
+  } else {
+    goals[selectedMonth] = valor;
+  }
+  await storageSet(GOALS_KEY, JSON.stringify(goals));
+  render();
+});
 
 function atualizarCartaoSync(){
   const card = document.getElementById('syncCard');
@@ -764,6 +787,7 @@ document.getElementById('criarCodigoBtn').addEventListener('click', async () => 
     setSyncBucket(bucket);
     await storageSet(STORAGE_KEY, JSON.stringify(shifts));
     await storageSet(RATE_KEY, String(rate));
+    await storageSet(GOALS_KEY, JSON.stringify(goals));
     atualizarCartaoSync();
     mostrarEstado('Código de sincronização criado', 'ok');
   }catch(e){
