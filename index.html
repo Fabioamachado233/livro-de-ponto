@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Livro de Ponto</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1F3A38">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --paper: #F1ECE1;
+    --paper-line: #D8CFBB;
+    --ink: #2B2A28;
+    --ink-soft: #6B6558;
+    --navy: #1F3A38;
+    --navy-soft: #365856;
+    --amber: #B8763B;
+    --amber-soft: #E4C9A8;
+    --red: #8C3B2E;
+    --red-soft: #E3C2BA;
+    --mono: 'Courier New', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  body{
+    margin:0;
+    background: var(--paper);
+    background-image:
+      repeating-linear-gradient(var(--paper), var(--paper) 27px, var(--paper-line) 28px);
+    color: var(--ink);
+    font-family: Georgia, 'Times New Roman', serif;
+    padding: 32px 16px 64px;
+  }
+
+  .sheet{ max-width: 760px; margin: 0 auto; }
+
+  .letterhead{
+    display:flex; justify-content: space-between; align-items: flex-end;
+    border-bottom: 2px solid var(--navy); padding-bottom: 10px; margin-bottom: 22px;
+  }
+  .letterhead h1{ font-size: 26px; letter-spacing: 0.5px; margin:0; color: var(--navy); font-weight: 700; }
+  .letterhead .sub{ font-family: var(--mono); font-size: 12px; color: var(--ink-soft); text-transform: uppercase; letter-spacing: 1px; }
+  .letterhead .rate{ text-align:right; font-family: var(--mono); font-size: 13px; }
+  .letterhead .rate input{
+    width: 56px; font-family: var(--mono); font-size: 13px; background: transparent; border: none;
+    border-bottom: 1px dashed var(--ink-soft); color: var(--amber); font-weight:bold; text-align:right;
+  }
+
+  .card{
+    background: rgba(255,255,255,0.35); border: 1px solid var(--paper-line); border-left: 4px solid var(--navy);
+    padding: 18px 20px; margin-bottom: 20px;
+  }
+  .card h2{
+    margin: 0 0 14px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1.5px;
+    color: var(--navy); font-family: var(--mono); font-weight: 700;
+  }
+
+  .row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  .field{ display:flex; flex-direction:column; gap:4px; flex:1; min-width:110px; }
+  .field label{ font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--ink-soft); font-family: var(--mono); }
+  .field input, .field select{
+    font-family: var(--mono); font-size: 14px; padding: 7px 8px; border: 1px solid var(--paper-line);
+    background: #FBF8F1; color: var(--ink);
+  }
+  .field input:focus, .field select:focus{ outline: 1px solid var(--navy); }
+
+  .chips{ display:flex; gap:6px; flex-wrap:wrap; margin-top:2px; }
+  .chip{
+    font-family: var(--mono); font-size: 12px; padding: 5px 10px; border: 1px solid var(--navy-soft);
+    color: var(--navy); background: transparent; cursor:pointer;
+  }
+  .chip:hover{ background: var(--navy); color:#fff; }
+  .chip.active{ background: var(--navy); color:#fff; }
+
+  .turno-btn{
+    font-family: var(--mono); font-size: 13px; padding: 9px 14px; border: 1px solid var(--ink-soft);
+    background: #FBF8F1; color: var(--ink); cursor:pointer; text-transform:uppercase; letter-spacing:0.5px;
+  }
+  .turno-btn[data-tipo="manha"].active{ background: var(--navy); border-color: var(--navy); color:#fff; }
+  .turno-btn[data-tipo="tarde"].active{ background: var(--amber); border-color: var(--amber); color:#fff; }
+  .turno-btn[data-tipo="duplo"].active{ background: var(--red); border-color: var(--red); color:#fff; }
+
+  .preview{
+    font-family: var(--mono); font-size: 13px; color: var(--ink-soft); margin-top: 10px;
+    border-left: 3px solid var(--paper-line); padding-left: 10px; min-height: 18px;
+  }
+  .preview b{ color: var(--ink); }
+
+  button.primary{
+    font-family: var(--mono); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+    background: var(--navy); color: #fff; border: none; padding: 10px 18px; cursor: pointer;
+  }
+  button.primary:hover{ background: var(--navy-soft); }
+
+  table{ width:100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+  thead th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color: var(--ink-soft);
+    border-bottom: 1px solid var(--ink); padding: 6px 4px;
+  }
+  tbody td{ padding: 7px 4px; border-bottom: 1px solid var(--paper-line); }
+  tbody tr:hover{ background: rgba(31,58,56,0.05); }
+  td.num, th.num{ text-align:right; }
+  .del{ background:none; border:none; color: var(--red); cursor:pointer; font-family: var(--mono); font-size:14px; }
+  .empty{ color: var(--ink-soft); font-style: italic; padding: 10px 4px; }
+
+  .tag{ font-size:11px; padding:2px 6px; font-family: var(--mono); color:#fff; }
+  .tag.manha{ background: var(--navy); }
+  .tag.tarde{ background: var(--amber); }
+  .tag.duplo{ background: var(--red); }
+
+  .month-select{ font-family: var(--mono); font-size:13px; padding:6px 8px; border:1px solid var(--paper-line); background:#FBF8F1; }
+
+  .summary-grid{ display:flex; gap:0; border: 1px solid var(--paper-line); }
+  .summary-item{ flex:1; padding: 14px 16px; border-right: 1px solid var(--paper-line); }
+  .summary-item:last-child{ border-right:none; }
+  .summary-item .label{ font-family: var(--mono); font-size: 11px; text-transform:uppercase; letter-spacing:0.5px; color: var(--ink-soft); }
+  .summary-item .value{ font-family: var(--mono); font-size: 22px; font-weight:bold; color: var(--navy); margin-top:4px; }
+  .summary-item.money .value{ color: var(--amber); }
+
+  .goal-grid{
+    display:grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--amber-soft);
+    background: rgba(184,118,59,0.06); margin-top: 4px;
+  }
+  .goal-cell{ padding: 14px 16px; border-right: 1px solid var(--amber-soft); border-bottom: 1px solid var(--amber-soft); }
+  .goal-cell:nth-child(2n){ border-right:none; }
+  .goal-cell .label{ font-family: var(--mono); font-size: 11px; text-transform:uppercase; letter-spacing:0.5px; color: var(--ink-soft); }
+  .goal-cell .value{ font-family: var(--mono); font-size: 20px; font-weight:bold; margin-top:4px; }
+  .goal-cell.objetivo .value{ color: var(--navy); }
+  .goal-cell.ganho .value{ color: var(--navy-soft); }
+  .goal-cell.faltam .value{ color: var(--red); }
+  .goal-cell.horas .value{ color: var(--amber); }
+
+  .calendar{ display:grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-dow{ font-family: var(--mono); font-size: 10px; text-align:center; color: var(--ink-soft); text-transform:uppercase; padding-bottom:4px; }
+  .cal-day{
+    aspect-ratio: 1; border: 1px solid var(--paper-line); padding: 4px; font-family: var(--mono);
+    display:flex; flex-direction:column; justify-content:space-between; background: rgba(255,255,255,0.3);
+  }
+  .cal-day.empty-cell{ border: none; background: none; }
+  .cal-day .num{ font-size: 11px; color: var(--ink-soft); }
+  .cal-day .shift-pill{ font-size: 9px; padding: 1px 3px; color:#fff; text-align:center; line-height:1.3; }
+  .cal-day .shift-pill.manha{ background: var(--navy); }
+  .cal-day .shift-pill.tarde{ background: var(--amber); }
+  .cal-day .shift-pill.duplo{ background: var(--red); }
+  .cal-day.today{ border-color: var(--navy); border-width: 2px; }
+
+  .chart-wrap{ overflow-x:auto; }
+  .chart-legend{ display:flex; gap:14px; font-family: var(--mono); font-size:11px; color: var(--ink-soft); margin-top:8px; }
+  .chart-legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .dot{ width:9px; height:9px; display:inline-block; }
+  .dot.manha{ background: var(--navy); }
+  .dot.tarde{ background: var(--amber); }
+  .dot.duplo{ background: var(--red); }
+
+  .save-status{
+    font-family: var(--mono); font-size: 12px; min-height: 16px; margin-bottom: 14px;
+  }
+  .save-status.ok{ color: var(--navy-soft); }
+  .save-status.erro{ color: var(--red); border-left: 3px solid var(--red); padding-left: 8px; }
+
+  .stamp{
+    text-align:center; font-family: var(--mono); font-size:11px; color: var(--ink-soft);
+    margin-top: 30px; letter-spacing: 1px; text-transform:uppercase;
+  }
+
+  @media (max-width: 480px){
+    .letterhead{ flex-direction:column; align-items:flex-start; gap:6px; }
+    .letterhead .rate{ text-align:left; }
+    .goal-grid{ grid-template-columns: 1fr; }
+    .goal-cell{ border-right:none; }
+    .cal-day .shift-pill{ font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <div class="letterhead">
+    <div>
+      <h1>Livro de Ponto</h1>
+      <div class="sub">Registo de turnos e vencimento</div>
+    </div>
+    <div class="rate">
+      Valor / hora<br>
+      € <input type="number" id="rateInput" step="0.01" value="6">
+    </div>
+  </div>
+
+  <div class="save-status" id="saveStatus"></div>
+
+  <div class="card">
+    <h2>Registar turno</h2>
+    <div class="row">
+      <div class="field">
+        <label>Data</label>
+        <input type="date" id="dataInput">
+      </div>
+      <div class="field">
+        <label>Nota (opcional)</label>
+        <input type="text" id="notaInput" placeholder="ex: troca com colega">
+      </div>
+    </div>
+
+    <div class="row" style="gap:8px;">
+      <button class="turno-btn" data-tipo="manha">Manhã</button>
+      <button class="turno-btn" data-tipo="tarde">Tarde</button>
+      <button class="turno-btn" data-tipo="duplo">Duplo</button>
+    </div>
+
+    <div class="chips" id="durChips"></div>
+
+    <div class="preview" id="previewBox">Escolha o turno e a duração.</div>
+
+    <div style="margin-top:14px;">
+      <button class="primary" id="addBtn">Adicionar turno</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Calendário do mês</h2>
+    <div class="row" style="margin-bottom:14px;">
+      <div class="field" style="max-width:220px;">
+        <label>Mês</label>
+        <select class="month-select" id="monthFilter"></select>
+      </div>
+    </div>
+    <div class="calendar" id="calendarBox"></div>
+    <div class="chart-legend">
+      <span><i class="dot manha"></i>Manhã</span>
+      <span><i class="dot tarde"></i>Tarde</span>
+      <span><i class="dot duplo"></i>Duplo</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ganhos por dia</h2>
+    <div class="chart-wrap" id="chartBox"></div>
+  </div>
+
+  <div class="card">
+    <h2>Turnos registados</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Turno</th>
+          <th>Horário</th>
+          <th class="num">Horas</th>
+          <th class="num">Valor</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="turnosBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>Resumo do mês</h2>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <div class="label">Turnos</div>
+        <div class="value" id="sumTurnos">0</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">Horas totais</div>
+        <div class="value" id="sumHoras">0</div>
+      </div>
+      <div class="summary-item money">
+        <div class="label">A receber</div>
+        <div class="value" id="sumValor">€0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Objetivo de rendimento</h2>
+    <div class="row">
+      <div class="field">
+        <label>Quanto quer receber este mês</label>
+        <input type="number" id="metaInput" step="1" placeholder="ex: 900">
+      </div>
+    </div>
+    <div class="goal-grid" id="goalGrid" style="display:none;">
+      <div class="goal-cell objetivo">
+        <div class="label">Objetivo</div>
+        <div class="value" id="goalObjetivo">0 €</div>
+      </div>
+      <div class="goal-cell ganho">
+        <div class="label">Já ganhaste</div>
+        <div class="value" id="goalGanho">0 €</div>
+      </div>
+      <div class="goal-cell faltam">
+        <div class="label">Faltam</div>
+        <div class="value" id="goalFaltam">0 €</div>
+      </div>
+      <div class="goal-cell horas">
+        <div class="label">Horas necessárias</div>
+        <div class="value" id="goalHoras">0 h</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="stamp">Registo pessoal · valores calculados automaticamente</div>
+</div>
+
+<script>
+let shifts = [];
+let rate = 6;
+let tipoSelecionado = null;
+let horasSelecionadas = null;
+
+const STORAGE_KEY = 'shifts-v2';
+const RATE_KEY = 'rate-v1';
+
+const INICIO = { manha: '08:30', tarde: '14:30', duplo: '08:30' };
+const DURACOES = { manha: [6, 6.5, 7], tarde: [6, 6.5, 7], duplo: [12, 12.5] };
+const NOME_TIPO = { manha: 'Manhã', tarde: 'Tarde', duplo: 'Duplo' };
+
+function monthKey(dateStr){ return dateStr.slice(0,7); }
+
+function monthLabel(key){
+  const [y,m] = key.split('-');
+  const nomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  return nomes[parseInt(m,10)-1] + ' ' + y;
+}
+
+function fmtEuro(v){
+  return v.toLocaleString('pt-PT', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+}
+
+function arredondarHorasTotais(v){
+  return v % 1 !== 0 ? Math.ceil(v) : v;
+}
+
+function fmtHoras(v){
+  return v.toLocaleString('pt-PT', {minimumFractionDigits: v % 1 === 0 ? 0 : 2, maximumFractionDigits:2});
+}
+
+function fmtDataPT(dateStr){
+  const [y,m,d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function horaFim(inicio, horas){
+  const [h,m] = inicio.split(':').map(Number);
+  const totalMin = h*60 + m + Math.round(horas*60);
+  const fh = Math.floor(totalMin/60) % 24;
+  const fm = totalMin % 60;
+  return String(fh).padStart(2,'0') + ':' + String(fm).padStart(2,'0');
+}
+
+function horarioTexto(tipo, horas){
+  const inicio = INICIO[tipo];
+  const fim = horaFim(inicio, horas);
+  return `${inicio} — ${fim}`;
+}
+
+const TEM_STORAGE_NATIVO = (typeof window.storage !== 'undefined');
+
+async function storageGet(chave){
+  if(TEM_STORAGE_NATIVO){
+    try{
+      const r = await window.storage.get(chave, false);
+      return r ? r.value : null;
+    }catch(e){ /* tenta localStorage abaixo */ }
+  }
+  try{
+    return localStorage.getItem(chave);
+  }catch(e){ return null; }
+}
+
+async function storageSet(chave, valor){
+  try{ localStorage.setItem(chave, valor); }catch(e){ /* ignora, tenta na mesma o storage nativo */ }
+  if(TEM_STORAGE_NATIVO){
+    await comNovaTentativa(() => window.storage.set(chave, valor, false));
+  }
+}
+
+async function loadData(){
+  try{
+    const v = await storageGet(STORAGE_KEY);
+    shifts = v ? JSON.parse(v) : [];
+  }catch(e){ shifts = []; }
+  try{
+    const v2 = await storageGet(RATE_KEY);
+    rate = v2 ? parseFloat(v2) : 6;
+  }catch(e){ rate = 6; }
+  document.getElementById('rateInput').value = rate;
+}
+
+function esperar(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function comNovaTentativa(fn, tentativas = 3, atrasoBase = 500){
+  let ultimoErro;
+  for(let i = 0; i < tentativas; i++){
+    try{
+      return await fn();
+    }catch(e){
+      ultimoErro = e;
+      if(i < tentativas - 1) await esperar(atrasoBase * (i + 1));
+    }
+  }
+  throw ultimoErro;
+}
+
+function mostrarEstado(texto, tipo){
+  const box = document.getElementById('saveStatus');
+  if(!box) return;
+  box.textContent = texto;
+  box.className = 'save-status' + (tipo ? ' ' + tipo : '');
+  if(tipo === 'ok'){
+    setTimeout(() => {
+      if(box.textContent === texto) box.textContent = '';
+    }, 2500);
+  }
+}
+
+async function saveShifts(){
+  try{
+    await storageSet(STORAGE_KEY, JSON.stringify(shifts));
+    mostrarEstado('Guardado', 'ok');
+  }catch(e){
+    console.error('Erro ao guardar', e);
+    mostrarEstado('Guardado apenas neste telemóvel/navegador. A sincronização remota falhou; os dados locais estão a salvo.', 'erro');
+  }
+}
+
+async function saveRate(){
+  try{
+    await storageSet(RATE_KEY, String(rate));
+    mostrarEstado('Guardado', 'ok');
+  }catch(e){
+    console.error('Erro ao guardar taxa', e);
+    mostrarEstado('Não foi possível guardar o valor por hora agora. Tenta novamente dentro de momentos.', 'erro');
+  }
+}
+
+function selecionarTipo(tipo){
+  tipoSelecionado = tipo;
+  horasSelecionadas = null;
+  document.querySelectorAll('.turno-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-tipo') === tipo));
+
+  const durBox = document.getElementById('durChips');
+  durBox.innerHTML = DURACOES[tipo].map(h => {
+    const label = h % 1 === 0 ? `${h}h` : `${Math.floor(h)}h30`;
+    return `<button class="chip" data-h="${h}">${label}</button>`;
+  }).join('');
+  atualizarPreview();
+}
+
+function atualizarPreview(){
+  const box = document.getElementById('previewBox');
+  if(!tipoSelecionado || horasSelecionadas === null){
+    box.innerHTML = 'Escolha o turno e a duração.';
+    return;
+  }
+  const horario = horarioTexto(tipoSelecionado, horasSelecionadas);
+  const valor = horasSelecionadas * rate;
+  box.innerHTML = `<b>${NOME_TIPO[tipoSelecionado]}</b> · ${horario} · ${fmtHoras(horasSelecionadas)}h · <b>${fmtEuro(valor)}</b>`;
+}
+
+document.querySelectorAll('.turno-btn').forEach(btn => {
+  btn.addEventListener('click', () => selecionarTipo(btn.getAttribute('data-tipo')));
+});
+
+document.getElementById('durChips').addEventListener('click', (e) => {
+  const btn = e.target.closest('.chip');
+  if(!btn) return;
+  document.querySelectorAll('#durChips .chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  horasSelecionadas = parseFloat(btn.getAttribute('data-h'));
+  atualizarPreview();
+});
+
+let aAdicionarTurno = false;
+
+document.getElementById('addBtn').addEventListener('click', async () => {
+  if(aAdicionarTurno) return;
+
+  const data = document.getElementById('dataInput').value;
+  const nota = document.getElementById('notaInput').value.trim();
+
+  if(!data){ alert('Indique a data do turno.'); return; }
+  if(!tipoSelecionado){ alert('Escolha se é turno da manhã, da tarde ou duplo.'); return; }
+  if(horasSelecionadas === null){ alert('Escolha a duração do turno.'); return; }
+
+  aAdicionarTurno = true;
+  const btn = document.getElementById('addBtn');
+  btn.disabled = true;
+  btn.textContent = 'A adicionar...';
+
+  try{
+    const jaExiste = shifts.some(s => s.data === data && s.tipo === tipoSelecionado && s.horas === horasSelecionadas);
+    if(jaExiste){
+      const confirmar = confirm('Já existe um turno igual registado neste dia. Queres mesmo adicionar outro?');
+      if(!confirmar){ return; }
+    }
+
+    shifts.push({
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2,6),
+      data, tipo: tipoSelecionado, horas: horasSelecionadas, nota
+    });
+    await saveShifts();
+    document.getElementById('notaInput').value = '';
+    render();
+  } finally {
+    aAdicionarTurno = false;
+    btn.disabled = false;
+    btn.textContent = 'Adicionar turno';
+  }
+});
+
+const MESES_FIXOS = ['2026-06', '2026-07', '2026-08'];
+
+function populateMonthFilter(){
+  const sel = document.getElementById('monthFilter');
+  const keysDados = shifts.map(s => monthKey(s.data));
+  const keys = Array.from(new Set([...MESES_FIXOS, ...keysDados])).sort();
+  const current = new Date().toISOString().slice(0,7);
+  const prevValue = sel.value;
+  sel.innerHTML = keys.map(k => `<option value="${k}">${monthLabel(k)}</option>`).join('');
+  if(prevValue && keys.includes(prevValue)){
+    sel.value = prevValue;
+  } else if(keys.includes(current)){
+    sel.value = current;
+  } else {
+    sel.value = keys[0];
+  }
+}
+
+function renderCalendar(selectedMonth, filtered){
+  const box = document.getElementById('calendarBox');
+  const [y,m] = selectedMonth.split('-').map(Number);
+  const firstDay = new Date(y, m-1, 1);
+  const lastDay = new Date(y, m, 0).getDate();
+  let startWeekday = firstDay.getDay();
+  startWeekday = startWeekday === 0 ? 6 : startWeekday - 1;
+
+  const todayStr = new Date().toISOString().slice(0,10);
+  const porDia = {};
+  filtered.forEach(s => {
+    const dia = parseInt(s.data.split('-')[2], 10);
+    if(!porDia[dia]) porDia[dia] = [];
+    porDia[dia].push(s);
+  });
+
+  let html = ['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  for(let i=0;i<startWeekday;i++){ html += `<div class="cal-day empty-cell"></div>`; }
+
+  for(let d=1; d<=lastDay; d++){
+    const dateStr = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === todayStr;
+    const dayShifts = porDia[d] || [];
+    const pills = dayShifts.map(s => {
+      const lbl = s.horas % 1 === 0 ? `${s.horas}h` : `${Math.floor(s.horas)}h30`;
+      return `<div class="shift-pill ${s.tipo}">${lbl}</div>`;
+    }).join('');
+    html += `<div class="cal-day ${isToday ? 'today' : ''}"><div class="num">${d}</div>${pills}</div>`;
+  }
+
+  box.innerHTML = html;
+}
+
+function renderChart(selectedMonth, filtered){
+  const box = document.getElementById('chartBox');
+  const [y,m] = selectedMonth.split('-').map(Number);
+  const lastDay = new Date(y, m, 0).getDate();
+
+  const porDia = {};
+  filtered.forEach(s => {
+    const dia = parseInt(s.data.split('-')[2], 10);
+    porDia[dia] = (porDia[dia] || 0) + s.horas * rate;
+  });
+
+  const maxVal = Math.max(1, ...Object.values(porDia));
+  const w = Math.max(360, lastDay * 16);
+  const h = 120;
+  const barW = 10;
+  const gap = 6;
+
+  let bars = '';
+  for(let d=1; d<=lastDay; d++){
+    const val = porDia[d] || 0;
+    const barH = val > 0 ? Math.max(2, (val / maxVal) * (h - 20)) : 0;
+    const x = (d-1) * (barW + gap) + 4;
+    const y0 = h - barH - 14;
+    const color = val > 0 ? 'var(--navy)' : 'var(--paper-line)';
+    bars += `<rect x="${x}" y="${y0}" width="${barW}" height="${Math.max(barH,1)}" fill="${color}"></rect>`;
+    if(d % 5 === 0 || d === 1 || d === lastDay){
+      bars += `<text x="${x + barW/2}" y="${h-2}" font-size="8" text-anchor="middle" fill="var(--ink-soft)" font-family="Courier New, monospace">${d}</text>`;
+    }
+  }
+
+  box.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">${bars}</svg>`;
+}
+
+function render(){
+  populateMonthFilter();
+  const selectedMonth = document.getElementById('monthFilter').value;
+  const filtered = shifts.filter(s => monthKey(s.data) === selectedMonth).sort((a,b) => a.data.localeCompare(b.data));
+
+  const tbody = document.getElementById('turnosBody');
+  if(filtered.length === 0){
+    tbody.innerHTML = `<tr><td colspan="6" class="empty">Sem turnos registados neste mês.</td></tr>`;
+  } else {
+    tbody.innerHTML = filtered.map(s => `
+      <tr>
+        <td>${fmtDataPT(s.data)}</td>
+        <td><span class="tag ${s.tipo}">${NOME_TIPO[s.tipo]}</span></td>
+        <td>${horarioTexto(s.tipo, s.horas)}</td>
+        <td class="num">${fmtHoras(s.horas)}</td>
+        <td class="num">${fmtEuro(s.horas * rate)}</td>
+        <td><button class="del" data-id="${s.id}" title="remover">✕</button></td>
+      </tr>
+    `).join('');
+  }
+
+  const totalHoras = filtered.reduce((acc,s) => acc + s.horas, 0);
+  const horasArredondadas = arredondarHorasTotais(totalHoras);
+  const totalValor = horasArredondadas * rate;
+  document.getElementById('sumTurnos').textContent = filtered.length;
+  document.getElementById('sumHoras').textContent = fmtHoras(horasArredondadas);
+  document.getElementById('sumValor').textContent = fmtEuro(totalValor);
+
+  renderCalendar(selectedMonth, filtered);
+  renderChart(selectedMonth, filtered);
+  updateGoal(totalValor);
+
+  tbody.querySelectorAll('.del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-id');
+      shifts = shifts.filter(s => s.id !== id);
+      await saveShifts();
+      render();
+    });
+  });
+}
+
+function updateGoal(valorJaGanho){
+  const meta = parseFloat(document.getElementById('metaInput').value);
+  const grid = document.getElementById('goalGrid');
+  if(!meta || meta <= 0 || rate <= 0){
+    grid.style.display = 'none';
+    return;
+  }
+  grid.style.display = 'grid';
+  const faltam = Math.max(0, meta - valorJaGanho);
+  const horasNecessarias = faltam / rate;
+
+  document.getElementById('goalObjetivo').textContent = fmtEuro(meta);
+  document.getElementById('goalGanho').textContent = fmtEuro(valorJaGanho);
+  document.getElementById('goalFaltam').textContent = fmtEuro(faltam);
+  document.getElementById('goalHoras').textContent = `${fmtHoras(horasNecessarias)} h`;
+}
+
+document.getElementById('monthFilter').addEventListener('change', render);
+
+document.getElementById('rateInput').addEventListener('change', async (e) => {
+  const v = parseFloat(e.target.value);
+  rate = (v && v > 0) ? v : 6;
+  await saveRate();
+  atualizarPreview();
+  render();
+});
+
+document.getElementById('metaInput').addEventListener('input', render);
+
+(async function init(){
+  document.getElementById('dataInput').valueAsDate = new Date();
+  await loadData();
+  render();
+})();
+
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
