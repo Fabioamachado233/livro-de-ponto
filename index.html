@@ -190,6 +190,32 @@
 
   <div class="save-status" id="saveStatus"></div>
 
+  <div class="card" id="syncCard" style="display:none;">
+    <h2>Sincronização entre dispositivos</h2>
+    <div id="syncSemCodigo">
+      <div class="preview" style="margin-top:0;">Este telemóvel ou computador ainda não está ligado a nenhum código de sincronização. Cria um código novo aqui e depois cola esse mesmo código no outro dispositivo, para os dois partilharem os mesmos turnos.</div>
+      <div style="margin-top:12px;">
+        <button class="primary" id="criarCodigoBtn">Criar código de sincronização</button>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <div class="field">
+          <label>Já tenho um código de outro dispositivo</label>
+          <input type="text" id="codigoInput" placeholder="cola aqui o código">
+        </div>
+      </div>
+      <button class="primary" id="ligarCodigoBtn">Ligar a este código</button>
+    </div>
+    <div id="syncComCodigo" style="display:none;">
+      <div class="preview" style="margin-top:0;">Este dispositivo está ligado ao código:</div>
+      <div class="row" style="margin-top:8px;">
+        <div class="field">
+          <input type="text" id="codigoAtual" readonly>
+        </div>
+      </div>
+      <div class="preview">Cola este mesmo código no outro dispositivo, no campo "Já tenho um código de outro dispositivo", para os dois ficarem sincronizados.</div>
+    </div>
+  </div>
+
   <div class="card">
     <h2>Registar turno</h2>
     <div class="row">
@@ -358,6 +384,39 @@ function horarioTexto(tipo, horas){
 }
 
 const TEM_STORAGE_NATIVO = (typeof window.storage !== 'undefined');
+const SYNC_BUCKET_KEY = 'sync-bucket-id';
+
+function getSyncBucket(){
+  try{ return localStorage.getItem(SYNC_BUCKET_KEY); }catch(e){ return null; }
+}
+function setSyncBucket(id){
+  try{ localStorage.setItem(SYNC_BUCKET_KEY, id); }catch(e){}
+}
+
+async function kvdbCriarBalde(){
+  const res = await fetch('https://kvdb.io/', { method: 'POST' });
+  if(!res.ok) throw new Error('não foi possível criar o código de sincronização');
+  return (await res.text()).trim();
+}
+
+async function kvGet(chave){
+  const bucket = getSyncBucket();
+  if(!bucket) return null;
+  try{
+    const res = await fetch(`https://kvdb.io/${bucket}/${chave}`);
+    if(res.status === 404) return null;
+    if(!res.ok) return null;
+    return await res.text();
+  }catch(e){ return null; }
+}
+
+async function kvSet(chave, valor){
+  const bucket = getSyncBucket();
+  if(!bucket) return;
+  try{
+    await fetch(`https://kvdb.io/${bucket}/${chave}`, { method: 'PUT', body: valor });
+  }catch(e){ /* fica só local, sem sincronizar desta vez */ }
+}
 
 async function storageGet(chave){
   if(TEM_STORAGE_NATIVO){
@@ -365,6 +424,12 @@ async function storageGet(chave){
       const r = await window.storage.get(chave, false);
       return r ? r.value : null;
     }catch(e){ /* tenta localStorage abaixo */ }
+  } else if(getSyncBucket()){
+    const remoto = await kvGet(chave);
+    if(remoto !== null){
+      try{ localStorage.setItem(chave, remoto); }catch(e){}
+      return remoto;
+    }
   }
   try{
     return localStorage.getItem(chave);
@@ -372,9 +437,11 @@ async function storageGet(chave){
 }
 
 async function storageSet(chave, valor){
-  try{ localStorage.setItem(chave, valor); }catch(e){ /* ignora, tenta na mesma o storage nativo */ }
+  try{ localStorage.setItem(chave, valor); }catch(e){ /* ignora, tenta na mesma o resto */ }
   if(TEM_STORAGE_NATIVO){
     await comNovaTentativa(() => window.storage.set(chave, valor, false));
+  } else if(getSyncBucket()){
+    await kvSet(chave, valor);
   }
 }
 
@@ -668,9 +735,60 @@ document.getElementById('rateInput').addEventListener('change', async (e) => {
 
 document.getElementById('metaInput').addEventListener('input', render);
 
+function atualizarCartaoSync(){
+  const card = document.getElementById('syncCard');
+  if(TEM_STORAGE_NATIVO){
+    card.style.display = 'none';
+    return;
+  }
+  card.style.display = 'block';
+  const bucket = getSyncBucket();
+  const semCodigo = document.getElementById('syncSemCodigo');
+  const comCodigo = document.getElementById('syncComCodigo');
+  if(bucket){
+    semCodigo.style.display = 'none';
+    comCodigo.style.display = 'block';
+    document.getElementById('codigoAtual').value = bucket;
+  } else {
+    semCodigo.style.display = 'block';
+    comCodigo.style.display = 'none';
+  }
+}
+
+document.getElementById('criarCodigoBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('criarCodigoBtn');
+  btn.disabled = true;
+  btn.textContent = 'A criar...';
+  try{
+    const bucket = await kvdbCriarBalde();
+    setSyncBucket(bucket);
+    await storageSet(STORAGE_KEY, JSON.stringify(shifts));
+    await storageSet(RATE_KEY, String(rate));
+    atualizarCartaoSync();
+    mostrarEstado('Código de sincronização criado', 'ok');
+  }catch(e){
+    console.error(e);
+    mostrarEstado('Não foi possível criar o código agora. Tenta novamente dentro de momentos.', 'erro');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Criar código de sincronização';
+  }
+});
+
+document.getElementById('ligarCodigoBtn').addEventListener('click', async () => {
+  const codigo = document.getElementById('codigoInput').value.trim();
+  if(!codigo){ alert('Cola o código que aparece no outro dispositivo.'); return; }
+  setSyncBucket(codigo);
+  await loadData();
+  atualizarCartaoSync();
+  render();
+  mostrarEstado('Ligado ao código de sincronização', 'ok');
+});
+
 (async function init(){
   document.getElementById('dataInput').valueAsDate = new Date();
   await loadData();
+  atualizarCartaoSync();
   render();
 })();
 
